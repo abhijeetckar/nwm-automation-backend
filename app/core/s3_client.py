@@ -1,6 +1,8 @@
 import boto3
 from botocore.exceptions import NoCredentialsError
+
 from app.core.config import settings
+
 
 s3_client = boto3.client(
     "s3",
@@ -9,9 +11,15 @@ s3_client = boto3.client(
     region_name=settings.S3_REGION
 )
 
-def check_s3_connection():
-    try:
-        s3_client.list_buckets()
-        return True
-    except NoCredentialsError:
-        return False
+class Boto3ConnectionManager:
+
+    def __init__(self):
+        pass
+
+    @classmethod
+    def check_s3_connection(self):
+        try:
+            s3_client.list_buckets()
+            return True
+        except NoCredentialsError:
+            return False
