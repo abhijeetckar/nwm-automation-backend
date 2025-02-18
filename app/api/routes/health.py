@@ -38,30 +38,27 @@ async def health_check(request:Request,forceUpdate: Optional[bool] = False,db: S
     # check_database_connection = await DatabaseConnectionManager.check_connection() ## Check Database Connection
     # redis_database_connection = await RedisConnectionManager.check_redis_connection() ## Check Redis Connection
     # s3_connection = Boto3ConnectionManager.check_s3_connection() ## Check S3 Connection
-    try:
-        if forceUpdate:
-            status_code = "success_response"
-            check_database_connection = await DatabaseConnectionManager.check_connection()  ## Check Database Connection
-            redis_database_connection = await RedisConnectionManager.check_redis_connection()  ## Check Redis Connection
-            # s3_connection = Boto3ConnectionManager.check_s3_connection()  ## Check S3 Connection
-        else:
-            status_code = "success_response"
-            check_database_connection = await DatabaseConnectionManager.check_connection()  ## Check Database Connection
-            redis_database_connection = await RedisConnectionManager.check_redis_connection()  ## Check Redis Connection
-            # s3_connection = Boto3ConnectionManager.check_s3_connection()  ## Check S3 Connection
+    if forceUpdate:
+        status_code = "success_response"
+        check_database_connection = await DatabaseConnectionManager.check_connection()  ## Check Database Connection
+        redis_database_connection = await RedisConnectionManager.check_redis_connection()  ## Check Redis Connection
+        # s3_connection = Boto3ConnectionManager.check_s3_connection()  ## Check S3 Connection
+    else:
+        status_code = "success_response"
+        check_database_connection = await DatabaseConnectionManager.check_connection()  ## Check Database Connection
+        redis_database_connection = await RedisConnectionManager.check_redis_connection()  ## Check Redis Connection
+        # s3_connection = Boto3ConnectionManager.check_s3_connection()  ## Check S3 Connection
 
 
-        health_response = {
-            "databaseConnection": "success" if check_database_connection else "failed",
-            "redisConnection": "success" if redis_database_connection else "failed",
-            # "S3Connection": "success" if s3_connection else "failed"
-        }
-        redis_client = await RedisConnectionManager.get_redis_connection()
-        await redis_client.set('health_check_status', str(health_response))
-        if not check_database_connection or not redis_database_connection :
-            status_code = "bad_gateway"
+    health_response = {
+        "databaseConnection": "success" if check_database_connection else "failed",
+        "redisConnection": "success" if redis_database_connection else "failed",
+        # "S3Connection": "success" if s3_connection else "failed"
+    }
+    redis_client = await RedisConnectionManager.get_redis_connection()
+    await redis_client.set('health_check_status', str(health_response))
+    if not check_database_connection or not redis_database_connection :
+        status_code = "bad_gateway"
 
-        api_response_obj = APIResponse(request.headers.get("requestId"), status_code=status_code, data=health_response)
-        return await api_response_obj.response_model()
-    except Exception as exl:
-        print(exl)
+    api_response_obj = APIResponse(request.headers.get("requestId"), status_code=status_code, data=health_response)
+    return await api_response_obj.response_model()
