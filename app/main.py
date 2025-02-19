@@ -30,3 +30,4 @@ async def app_middleware(request: Request, call_next):
     middleware_handler = Middleware(request=request)
     return await middleware_handler.execute_middleware(call_next)
 
+
