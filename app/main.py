@@ -17,10 +17,13 @@ from app.core.redis_client import RedisConnectionManager
 from app.utils.error_handling.global_handler import GlobalHandler
 from app.utils.middleware.middleware import Middleware
 from app.api.routes.health import health_router as router
+from app.api.routes.chacha import capcha_router
 
 app = FastAPI()
 
 app.include_router(router, prefix="/v1")
+
+app.include_router(capcha_router, prefix="/v1")
 
 
 @app.middleware('http')
