@@ -19,7 +19,6 @@ from app.utils.middleware.middleware import Middleware
 from app.api.routes.health import health_router as router
 from app.api.routes.chacha import capcha_router
 from app.api.routes.download_document import download_router
-
 app = FastAPI()
 
 app.include_router(router, prefix="/v1")

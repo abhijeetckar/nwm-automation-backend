@@ -1,11 +1,14 @@
 import os
 
-from app.core.http_connection_manager import HTTPConnectionManager
+from fastapi.encoders import jsonable_encoder
 
+from app.core.http_connection_manager import HTTPConnectionManager
+from app.utils.error_handling.loggers import async_info, async_debug
+import inspect
 
 class ManufacturerOperations:
-    def __init__(self):
-        pass
+    def __init__(self,request_id):
+        self.request_id = request_id
 
     async def call_to_token_api(self):
         token_body = {
@@ -36,6 +39,9 @@ class ManufacturerOperations:
         return file_path
 
     async def document_download_api(self):
+        current_funtion = inspect.currentframe().f_code.co_name
+        await async_info(self.request_id, current_funtion,
+                         f"Started Execution of Funtion: {current_funtion}")
         param_body = {
             "segment": "CM",
             "folderPath": "/Reports",
@@ -52,10 +58,15 @@ class ManufacturerOperations:
         response = await http_instance._token_authentication(
             "Bearer eyJhbGciOiJSUzI1NiJ9.eyJtZW1iZXJDZCI6IjkwMjk2Iiwic3ViIjoiOTAyOTYiLCJsb2dpbklkIjoiOTAyOTZURUNIIiwiaXNzIjoiOTAyOTZURUNIIiwiZXhwIjoxNzQwNDcyOTYwLCJpYXQiOjE3NDA0NjkzNjAsImp0aSI6IjUwZGEyOGQ5LTI3ZTQtNGJmOS1iNjUyLWQ4N2YxZTJhMjgwMyJ9.aKYzj3S3Bap8YhmxV5E85DG42BUBgkL1wTnDiHiS8BsShtQXdS5ZQZ3egibqbNSvKHpLacmCSHx1G6SUyrGNOA",
             "Authorization")
+        await async_debug(self.request_id, current_funtion,f"Status Code:{response.status_code}")
         if response.status_code == 200 and response.headers.get('content-type') is None:
             file_path = await self.extract_the_folder(response)
+            await async_info(self.request_id, current_funtion,
+                             f"Ended Execution of Funtion: {current_funtion}")
             return file_path
         else:
+            await async_info(self.request_id, current_funtion,
+                             f"Ended Execution of Funtion: {current_funtion}")
             return ""
         # return response_1
 
