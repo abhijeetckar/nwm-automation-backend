@@ -12,10 +12,10 @@ def send_alert_system(to_addrees,email_message):
 
     smtp.quit()
 
-try:
-    to_addrees = "bkamlesh213@gmail.com"
-    email_message = f"Subject: Alert System!\n\nCode Fat gaya"
-    send_alert_system(to_addrees,email_message)
-except Exception as exp:
-    print(exp)
+# try:
+#     to_addrees = "bkamlesh213@gmail.com"
+#     email_message = f"Subject: Alert System!\n\nCode Fat gaya"
+#     send_alert_system(to_addrees,email_message)
+# except Exception as exp:
+#     print(exp)
 
