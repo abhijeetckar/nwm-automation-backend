@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 from app.models.holiday import HolidayMaster,HolidayException
 from sqlalchemy.sql import func
+from fastapi.encoders import jsonable_encoder
 
 # app/routes/files.py
 
@@ -79,9 +80,7 @@ def fetch_files(db: Session = Depends(get_db)):
 @router.get("/download")
 def process_file_downloads(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # Define headers to mimic a browser request
-    from sqlalchemy.sql import func
     today = func.current_date()
-    from fastapi.encoders import jsonable_encoder
 
     holiday = db.query(HolidayMaster).filter(HolidayMaster.date == today).first()
     if holiday and holiday.defer_all:
