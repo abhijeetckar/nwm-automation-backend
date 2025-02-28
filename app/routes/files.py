@@ -35,13 +35,14 @@ def replace_date_patterns(filename: str) -> str:
 def fetch_files(db: Session = Depends(get_db)):
     """Fetch all records from files_master, modify filenames, insert into file_download_log, and return."""
     today = func.current_date()
+    reason = ""
     holiday = db.query(HolidayMaster).filter(HolidayMaster.date == today).first()
     if holiday and holiday.defer_all:
         holiday_exception = db.query(HolidayException).filter(HolidayException.date == today).first()
         if holiday_exception is None:
-            return {"message": "Today is holiday"}
+            reason = holiday.description
         if holiday_exception and holiday_exception.defer_all:
-            return {"message": "Today is holiday"}
+            reason =  holiday_exception.description
 
     files = db.query(FilesMaster).all()
     reformatted_files = []
@@ -56,14 +57,17 @@ def fetch_files(db: Session = Depends(get_db)):
         download_url = f"{file.url}{updated_filename}"  # Concatenate the URL and the filename
 
         # Insert into file_download_log
-        log_entry = FileDownloadLog(filename=updated_filename, fileurl=download_url)
+        update_data = {
+            "filename":updated_filename,
+            "fileurl":download_url
+        }
+        if len(reason) >0:
+            update_data["reason"] = reason
+        # log_entry = FileDownloadLog(filename=updated_filename, fileurl=download_url)
+        log_entry = FileDownloadLog(**update_data)
         db.add(log_entry)
 
-        reformatted_files.append({
-            "id": file.id,
-            "filename": updated_filename,
-            "url": download_url
-        })
+        reformatted_files.append(update_data)
 
     db.flush()  # Ensures all insertions are staged before committing
     db.commit()  # Commit all insertions at once
@@ -77,14 +81,15 @@ def process_file_downloads(background_tasks: BackgroundTasks, db: Session = Depe
     # Define headers to mimic a browser request
     from sqlalchemy.sql import func
     today = func.current_date()
+    from fastapi.encoders import jsonable_encoder
 
     holiday = db.query(HolidayMaster).filter(HolidayMaster.date == today).first()
     if holiday and holiday.defer_all:
         holiday_exception = db.query(HolidayException).filter(HolidayException.date == today).first()
         if holiday_exception is None:
-            return {"message": "Today is holiday"}
+            return jsonable_encoder(holiday)
         if holiday_exception and holiday_exception.defer_all:
-            return {"message": "Today is holiday"}
+            return jsonable_encoder(holiday_exception)
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Referer": "https://www.bseindia.com"
