@@ -112,10 +112,11 @@ async def process_file_downloads(request:Request,background_tasks: BackgroundTas
     # Add background tasks for each file
     for file_entry in pending_files:
         # Use the file's fileurl and filename from file_download_log
-        file_url = file_entry.fileurl
-        filename = file_entry.filename
-        # Add a task to download the file in the background
-        background_tasks.add_task(download_file, file_url, headers, DOWNLOAD_DIR, filename, db, file_entry)
+        if len(file_entry.reason) == 0:
+            file_url = file_entry.fileurl
+            filename = file_entry.filename
+            # Add a task to download the file in the background
+            background_tasks.add_task(download_file, file_url, headers, DOWNLOAD_DIR, filename, db, file_entry)
 
     api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
                                    data={"message": "Download process started in the background."})
