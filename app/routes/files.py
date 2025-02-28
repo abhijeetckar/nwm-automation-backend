@@ -8,6 +8,9 @@ from app.models.file_download_log import FileDownloadLog
 from app.schemas.files import FilesSchema
 import re
 from datetime import datetime
+from app.models.holiday import HolidayMaster,HolidayException
+from sqlalchemy.sql import func
+
 # app/routes/files.py
 
 from app.services.file_download_service import download_files_task  # Import the download task
@@ -27,9 +30,19 @@ def replace_date_patterns(filename: str) -> str:
     
     return filename
 
+
 @router.get("/files", response_model=list[FilesSchema])
 def fetch_files(db: Session = Depends(get_db)):
     """Fetch all records from files_master, modify filenames, insert into file_download_log, and return."""
+    today = func.current_date()
+    holiday = db.query(HolidayMaster).filter(HolidayMaster.date == today).first()
+    if holiday and holiday.defer_all:
+        holiday_exception = db.query(HolidayException).filter(HolidayException.date == today).first()
+        if holiday_exception is None:
+            return {"message": "Today is holiday"}
+        if holiday_exception and holiday_exception.defer_all:
+            return {"message": "Today is holiday"}
+
     files = db.query(FilesMaster).all()
     reformatted_files = []
 
@@ -62,12 +75,22 @@ def fetch_files(db: Session = Depends(get_db)):
 @router.get("/download")
 def process_file_downloads(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # Define headers to mimic a browser request
+    from sqlalchemy.sql import func
+    today = func.current_date()
+
+    holiday = db.query(HolidayMaster).filter(HolidayMaster.date == today).first()
+    if holiday and holiday.defer_all:
+        holiday_exception = db.query(HolidayException).filter(HolidayException.date == today).first()
+        if holiday_exception is None:
+            return {"message": "Today is holiday"}
+        if holiday_exception and holiday_exception.defer_all:
+            return {"message": "Today is holiday"}
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Referer": "https://www.bseindia.com"
     }
     DOWNLOAD_DIR = "downloads"
-    
+
     # Fetch files that haven't been downloaded yet
     pending_files = db.query(FileDownloadLog).filter_by(downloaded=False).all()
 
