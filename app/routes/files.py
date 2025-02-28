@@ -1,6 +1,6 @@
 import os
 import requests
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks,Request
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models.files_master import FilesMaster
@@ -15,6 +15,7 @@ from fastapi.encoders import jsonable_encoder
 # app/routes/files.py
 
 from app.services.file_download_service import download_files_task  # Import the download task
+from app.utils.response_handler.response_handler import APIResponse
 
 # os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -33,7 +34,7 @@ def replace_date_patterns(filename: str) -> str:
 
 
 @router.get("/files", response_model=list[FilesSchema])
-def fetch_files(db: Session = Depends(get_db)):
+async def fetch_files(request:Request,db: Session = Depends(get_db)):
     """Fetch all records from files_master, modify filenames, insert into file_download_log, and return."""
     today = func.current_date()
     reason = ""
@@ -75,10 +76,13 @@ def fetch_files(db: Session = Depends(get_db)):
 
     print("✅ Inserted all filenames into file_download_log")  # Debugging
 
-    return reformatted_files
+    # return reformatted_files
+    api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
+                                   data=reformatted_files)
+    return await api_response_obj.response_model()
 
 @router.get("/download")
-def process_file_downloads(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def process_file_downloads(request:Request,background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # Define headers to mimic a browser request
     today = func.current_date()
 
@@ -86,9 +90,14 @@ def process_file_downloads(background_tasks: BackgroundTasks, db: Session = Depe
     if holiday and holiday.defer_all:
         holiday_exception = db.query(HolidayException).filter(HolidayException.date == today).first()
         if holiday_exception is None:
-            return jsonable_encoder(holiday)
+            api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
+                                           data=jsonable_encoder(holiday))
+            return await api_response_obj.response_model()
         if holiday_exception and holiday_exception.defer_all:
-            return jsonable_encoder(holiday_exception)
+            api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
+                                           data=jsonable_encoder(holiday_exception))
+            return await api_response_obj.response_model()
+
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Referer": "https://www.bseindia.com"
@@ -108,7 +117,10 @@ def process_file_downloads(background_tasks: BackgroundTasks, db: Session = Depe
         # Add a task to download the file in the background
         background_tasks.add_task(download_file, file_url, headers, DOWNLOAD_DIR, filename, db, file_entry)
 
-    return {"message": "Download process started in the background."}
+    api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
+                                   data={"message": "Download process started in the background."})
+    return await api_response_obj.response_model()
+    # return {"message": "Download process started in the background."}
 
 
 def download_file(url: str, headers: dict, download_dir: str, filename: str, db: Session, file_entry: FileDownloadLog):

@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,Request
 from loguru import logger
 from app.db import engine
-from app.routes import holiday, files  
+from app.routes import holiday, files
+from app.utils.middleware.middleware import Middleware
 
 app = FastAPI()
 
@@ -19,3 +20,10 @@ def startup_event():
 
 app.include_router(holiday.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
+
+@app.middleware('http')
+async def app_middleware(request: Request, call_next):
+    # await DatabaseConnectionManager.established_connection()
+    # await RedisConnectionManager.establish_connection()
+    middleware_handler = Middleware(request=request)
+    return await middleware_handler.execute_middleware(call_next)
