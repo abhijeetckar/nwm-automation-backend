@@ -11,6 +11,8 @@ from datetime import datetime
 from app.models.holiday import HolidayMaster,HolidayException
 from sqlalchemy.sql import func
 from fastapi.encoders import jsonable_encoder
+from app.config import app_config
+import json
 
 # app/routes/files.py
 
@@ -23,7 +25,8 @@ router = APIRouter()
 
 def replace_date_patterns(filename: str) -> str:
     """Replace YYYYMMDD and DDMMYYYY placeholders with today's date."""
-    today = datetime.today()
+    # today = datetime.today()
+    today = datetime(2025, 2, 3)
     formatted_date1 = today.strftime("%Y%m%d")  # YYYYMMDD
     formatted_date2 = today.strftime("%d%m%Y")  # DDMMYYYY
 
@@ -61,7 +64,9 @@ async def fetch_files(request:Request,db: Session = Depends(get_db)):
         # Insert into file_download_log
         update_data = {
             "filename":updated_filename,
-            "fileurl":download_url
+            "fileurl":download_url,
+            "is_private":file.is_private,
+            "source":file.source,
         }
         if len(reason) >0:
             update_data["reason"] = reason
@@ -112,16 +117,21 @@ async def process_file_downloads(request:Request,background_tasks: BackgroundTas
     # Add background tasks for each file
     for file_entry in pending_files:
         # Use the file's fileurl and filename from file_download_log
-        if len(file_entry.reason) == 0:
+        if file_entry.reason is None or len(file_entry.reason) == 0:
             file_url = file_entry.fileurl
             filename = file_entry.filename
             # Add a task to download the file in the background
+            if file_entry.is_private:
+                response = requests.post(app_config.SOURCE_URL.get(file_entry.source,"").get("url",""), json=app_config.SOURCE_URL.get(file_entry.source,"").get("request_body",{}),headers=app_config.SOURCE_URL.get(file_entry.source,"").get("headers",{}))
+                json_response = response.json()
+                headers["Authorization"] = f"Bearer {response.json().get("token")}"
+                print(json_response)
             background_tasks.add_task(download_file, file_url, headers, DOWNLOAD_DIR, filename, db, file_entry)
+            # download_file(file_url, headers, DOWNLOAD_DIR, filename, db, file_entry)
 
     api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
                                    data={"message": "Download process started in the background."})
     return await api_response_obj.response_model()
-    # return {"message": "Download process started in the background."}
 
 
 def download_file(url: str, headers: dict, download_dir: str, filename: str, db: Session, file_entry: FileDownloadLog):
@@ -146,6 +156,7 @@ def download_file(url: str, headers: dict, download_dir: str, filename: str, db:
         else:
             print(f"❌ Failed to download file. HTTP Status Code: {response.status_code}")
             file_entry.reason = f"HTTP {response.status_code}"
+            print(f"-->{url}")
 
         # Increment attempts and commit changes
         file_entry.attempts += 1
@@ -156,6 +167,7 @@ def download_file(url: str, headers: dict, download_dir: str, filename: str, db:
     except requests.RequestException as e:
         # Handle any request-related exceptions (like connection errors)
         print(f"❌ Error while downloading file: {e}")
+        print(url)
         file_entry.reason = str(e)
 
         # Increment attempts and commit changes

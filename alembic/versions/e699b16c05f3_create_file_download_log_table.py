@@ -27,7 +27,13 @@ def upgrade():
         sa.Column('downloaded', sa.Boolean),
         sa.Column('reason', sa.String(50)),
         sa.Column('attempts', sa.Integer),
-        sa.Column('downloaded_at', sa.DateTime),   
+        sa.Column('downloaded_at', sa.DateTime),
+        sa.Column('is_private', sa.Boolean, nullable=False, server_default=sa.text("FALSE")),  # Corrected default
+        sa.Column('source', sa.String(50), nullable=True),  # Should be nullable for constraint logic
+        sa.CheckConstraint(
+            "NOT is_private OR source IS NOT NULL",  # Corrected check constraint
+            name="check_private_source_not_null"
+        )
     )
 
 def downgrade():
