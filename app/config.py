@@ -9,7 +9,9 @@ class AppConfig(BaseSettings):
     NSE_BASE_URL: str
     BSE_BASE_URL: str
     DOWNLOAD_DIR: str
-
+    CELERY_BROKER_URL: str  # Add Celery broker URL
+    CELERY_RESULT_BACKEND: str  # Add Celery result backend
+    
     class Config:
         env_file = ".env"  # Path to your .env file
 

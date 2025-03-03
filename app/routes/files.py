@@ -6,6 +6,7 @@ from app.db import get_db
 from app.models.files_master import FilesMaster
 from app.models.file_download_log import FileDownloadLog
 from app.schemas.files import FilesSchema
+from celery_app.tasks_file_download import fetch_files, process_file_downloads
 import re
 from datetime import datetime
 # app/routes/files.py
@@ -15,6 +16,19 @@ from app.services.file_download_service import download_files_task  # Import the
 # os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 router = APIRouter()
+
+@router.get("/files")
+def fetch_files_task():
+    """Trigger Celery task to fetch files and update `file_download_log`."""
+    task = fetch_files.delay()
+    return {"task_id": task.id, "status": "Fetching files in the background."}
+
+@router.get("/download")
+def process_download_task():
+    """Trigger Celery task to process all pending downloads."""
+    task = process_file_downloads.delay()
+    return {"task_id": task.id, "status": "Downloading files in the background."}
+
 
 def replace_date_patterns(filename: str) -> str:
     """Replace YYYYMMDD and DDMMYYYY placeholders with today's date."""
@@ -123,6 +137,3 @@ def download_file(url: str, headers: dict, download_dir: str, filename: str, db:
         db.add(file_entry)  # Ensure the object is added to the session
         db.flush()  # Explicitly flush changes to ensure they are staged in the session
         db.commit()  # Commit changes to the database
-
-
-

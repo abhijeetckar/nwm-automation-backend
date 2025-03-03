@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from loguru import logger
 from app.db import engine
-from app.routes import holiday, files  
+from app.routes import holiday, files, celery_tasks  
+from celery_app.tasks import fetch_data_task, fetch_users_task  # Import the Celery task
+from celery.result import AsyncResult
+from celery import chain
 
 app = FastAPI()
 
@@ -17,5 +20,10 @@ def startup_event():
     except Exception as e:
         logger.error(f"DB Connection Failed: {e}")
 
+# api_router = APIRouter(prefix="/api") #todo remove /api prefix
+
 app.include_router(holiday.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
+app.include_router(celery_tasks.router, prefix="/api/celery")
+
+# app.include_router(api_router)
