@@ -18,22 +18,56 @@ import json
 
 from app.services.file_download_service import download_files_task  # Import the download task
 from app.utils.response_handler.response_handler import APIResponse
+from datetime import datetime, timedelta
+import re
 
 # os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 router = APIRouter()
 
-def replace_date_patterns(filename: str) -> str:
+def replace_date_patterns(filename: str, days_offset: int = 0) -> str:
     """Replace YYYYMMDD and DDMMYYYY placeholders with today's date."""
     # today = datetime.today()
-    today = datetime(2025, 2, 3)
-    formatted_date1 = today.strftime("%Y%m%d")  # YYYYMMDD
-    formatted_date2 = today.strftime("%d%m%Y")  # DDMMYYYY
+    # # today = datetime(2025, 2, 3)
+    # formatted_date1 = today.strftime("%Y%m%d")  # YYYYMMDD
+    # formatted_date2 = today.strftime("%d%m%Y")  # DDMMYYYY
+    #
+    # filename = re.sub(r"YYYYMMDD", formatted_date1, filename)
+    # filename = re.sub(r"DDMMYYYY", formatted_date2, filename)
+    #
+    # return filename
+    adjusted_date = datetime.today() + timedelta(days=days_offset)
+    formatted_date1 = adjusted_date.strftime("%Y%m%d")  # YYYYMMDD
+    formatted_date2 = adjusted_date.strftime("%d%m%Y")  # DDMMYYYY
 
     filename = re.sub(r"YYYYMMDD", formatted_date1, filename)
     filename = re.sub(r"DDMMYYYY", formatted_date2, filename)
-    
     return filename
+
+
+def get_days_offset(db,filetime: str) -> int:
+    today = datetime.today()
+    # today = datetime(2025, 3, 3)
+    weekday = today.weekday()  # Monday = 0, Sunday = 6
+
+    if filetime == "EOD":
+        offset = -3 if weekday == 0 else -1  # Monday -> last Friday, otherwise yesterday
+    else:
+        offset = 0  # "BOD" files use the current day
+
+    adjusted_date = today + timedelta(days=offset)
+
+    while True:
+        holiday = db.query(HolidayMaster).filter(HolidayMaster.date == adjusted_date).first()
+        if holiday and holiday.defer_all:
+            holiday_exception = db.query(HolidayException).filter(HolidayException.date == adjusted_date).first()
+            if not holiday_exception or (holiday_exception and holiday_exception.defer_all):
+                offset -= 1
+                adjusted_date = today + timedelta(days=offset)
+                continue  # Check the next previous day
+        break  # Exit loop when a working day is found
+
+    return offset
 
 
 @router.get("/files", response_model=list[FilesSchema])
@@ -55,7 +89,7 @@ async def fetch_files(request:Request,db: Session = Depends(get_db)):
     print("Total files fetched:", len(files))  # Debugging
 
     for file in files:
-        updated_filename = replace_date_patterns(file.filename)
+        updated_filename = replace_date_patterns(file.filename,get_days_offset(db,file.file_time.value))
 
         print("Inserting into file_download_log:", updated_filename)  # Debugging
         
@@ -67,6 +101,7 @@ async def fetch_files(request:Request,db: Session = Depends(get_db)):
             "fileurl":download_url,
             "is_private":file.is_private,
             "source":file.source,
+            "file_time":file.file_time.value
         }
         if len(reason) >0:
             update_data["reason"] = reason

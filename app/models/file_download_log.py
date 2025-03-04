@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime,CheckConstraint
 from app.db import Base
 from datetime import datetime
+from app.models.files_master import file_time_enum
 
 class FileDownloadLog(Base):
     __tablename__ = "file_download_log"
@@ -14,7 +15,7 @@ class FileDownloadLog(Base):
     downloaded_at = Column(DateTime, nullable=True, default=datetime.utcnow)
     is_private = Column(Boolean, nullable=False, default=False)
     source = Column(String(50), nullable=True)
-
+    file_time = Column(file_time_enum, nullable=False, server_default="EOD")
     __table_args__ = (
         CheckConstraint(
             "NOT is_private OR source IS NOT NULL",
