@@ -47,13 +47,13 @@ def replace_date_patterns(filename: str, days_offset: int = 0) -> str:
 
 def get_days_offset(db,filetime: str) -> int:
     today = datetime.today()
-    # today = datetime(2025, 3, 3)
+    # today = datetime(2025, 3, 17)
     weekday = today.weekday()  # Monday = 0, Sunday = 6
 
     if filetime == "EOD":
         offset = -3 if weekday == 0 else -1  # Monday -> last Friday, otherwise yesterday
     else:
-        offset = 0  # "BOD" files use the current day
+        offset = 0# "BOD" files use the current day
 
     adjusted_date = today + timedelta(days=offset)
 
@@ -61,7 +61,7 @@ def get_days_offset(db,filetime: str) -> int:
         holiday = db.query(HolidayMaster).filter(HolidayMaster.date == adjusted_date).first()
         if holiday and holiday.defer_all:
             holiday_exception = db.query(HolidayException).filter(HolidayException.date == adjusted_date).first()
-            if not holiday_exception or (holiday_exception and holiday_exception.defer_all):
+            if  holiday_exception is None or (holiday_exception and holiday_exception.defer_all):
                 offset -= 1
                 adjusted_date = today + timedelta(days=offset)
                 continue  # Check the next previous day
