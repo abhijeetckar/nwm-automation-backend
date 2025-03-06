@@ -3,6 +3,7 @@ import requests
 from fastapi import APIRouter, Depends, BackgroundTasks,Request
 from sqlalchemy.orm import Session
 from app.db import get_db
+from app.models.file_download_archive import FileDownloadArchive
 from app.models.files_master import FilesMaster
 from app.models.file_download_log import FileDownloadLog
 from app.schemas.files import FilesSchema
@@ -20,6 +21,7 @@ from app.services.file_download_service import download_files_task  # Import the
 from app.utils.response_handler.response_handler import APIResponse
 from datetime import datetime, timedelta
 import re
+from enum import Enum
 
 # os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -210,6 +212,70 @@ def download_file(url: str, headers: dict, download_dir: str, filename: str, db:
         db.add(file_entry)  # Ensure the object is added to the session
         db.flush()  # Explicitly flush changes to ensure they are staged in the session
         db.commit()  # Commit changes to the database
+
+
+
+def serialize_log(log):
+    """Convert SQLAlchemy object to JSON serializable dict."""
+    log_dict = log.__dict__.copy()
+    log_dict.pop("_sa_instance_state", None)  # Remove SQLAlchemy metadata
+
+    # Convert datetime fields to string
+    for key, value in log_dict.items():
+        if isinstance(value, datetime):
+            log_dict[key] = value.isoformat()  # Convert datetime to ISO format
+        elif isinstance(value, Enum):
+            log_dict[key] = value.name
+
+    return log_dict
+
+@router.get("/file_download_archive")
+async def update_file_download_archive(request:Request,db: Session = Depends(get_db)):
+    try:
+        logs = db.query(FileDownloadLog).all()
+        if logs:
+            logs_json = [serialize_log(log) for log in logs]
+            archive_entry = FileDownloadArchive(date=func.now(), log=logs_json)
+            db.add(archive_entry)
+            db.query(FileDownloadLog).delete()
+            db.commit()
+        api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
+                                       data={"message": "Logs archived successfully"})
+        return await api_response_obj.response_model()
+    except Exception as exp:
+        print(exp)
+
+@router.get("/retry/download/{filename}")
+async def rety_to_download_file(request:Request,filename:str,db: Session = Depends(get_db)):
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://www.bseindia.com"
+    }
+    DOWNLOAD_DIR = "downloads"
+
+    # Fetch files that haven't been downloaded yet
+    pending_file = db.query(FileDownloadLog).filter_by(filename=filename).first()
+
+    # print(f"Pending files: {pending_file}")  # Log the number of pending files
+    if not pending_file.downloaded:
+        file_url = pending_file.fileurl
+        filename = pending_file.filename
+        # Add a task to download the file in the background
+        if pending_file.is_private:
+            response = requests.post(app_config.SOURCE_URL.get(pending_file.source, "").get("url", ""),
+                                     json=app_config.SOURCE_URL.get(pending_file.source, "").get("request_body", {}),
+                                     headers=app_config.SOURCE_URL.get(pending_file.source, "").get("headers", {}))
+            json_response = response.json()
+            headers["Authorization"] = f"Bearer {response.json().get("token")}"
+            print(json_response)
+        # background_tasks.add_task(download_file, file_url, headers, DOWNLOAD_DIR, filename, db, file_entry)
+        download_file(file_url, headers, DOWNLOAD_DIR, filename, db, pending_file)
+        api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
+                                       data={"message": "File Download is Completed"})
+        return await api_response_obj.response_model()
+    api_response_obj = APIResponse(request.headers.get("requestid"), status_code="success_response",
+                                   data={"message": "File is Already downloaded"})
+    return await api_response_obj.response_model()
 
 
 

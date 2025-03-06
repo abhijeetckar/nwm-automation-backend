@@ -1,7 +1,10 @@
 # import asyncio
 # from playwright.async_api import async_playwright
-# from app.utils.celery_task.celery_beat_configuration import app
+# # from app.utils.celery_task.celery_beat_configuration import app
 #
+# user_id = "90296TECH"
+# membercode = "90296"
+# password1 = "Neowealth@567"
 #
 #
 # async def capture_initial_network_calls():
@@ -9,7 +12,7 @@
 #         capcha_response = {"capcha": None}
 #
 #         async with async_playwright() as p:
-#             browser = await p.chromium.launch(channel='chrome',headless=False,devtools=False)
+#             browser = await p.chromium.launch(channel='chrome',headless=False,devtools=True)
 #             context = await browser.new_context()
 #             page = await context.new_page()
 #
@@ -31,11 +34,11 @@
 #                 raise Exception("CAPTCHA not extracted. Check network request.")
 #
 #             # Fill login details
-#             await page.fill('input[name="userid"]', "90296TECH")
+#             await page.fill('input[name="userid"]', user_id)
 #             await asyncio.sleep(3)
-#             await page.fill('input[name="membercode"]', "90296")
+#             await page.fill('input[name="membercode"]', membercode)
 #             await asyncio.sleep(3)
-#             await page.fill('input[name="password1"]', "Neowealth@567")
+#             await page.fill('input[name="password1"]', password1)
 #             await asyncio.sleep(3)
 #             await page.fill('input[id="UserCaptchaCode"]', capcha_response["capcha"])
 #             await asyncio.sleep(3)
@@ -62,8 +65,11 @@
 #                 error_message = await page.locator("div.error-message").text_content()
 #                 raise Exception(f"Login failed: {error_message}")
 #
+#             await page.wait_for_load_state("domcontentloaded")
+#
 #             # Ensure correct page is loaded
-#             await page.wait_for_function("window.location.href.includes('mainMenu')", timeout=20000)
+#             await page.wait_for_function("window.location.href.includes('mainMenu')", timeout=100000)
+#
 #
 #             # Ensure dashboard elements appear
 #             await page.wait_for_selector("div.dashboard", timeout=20000)
@@ -77,6 +83,34 @@
 #     except Exception as exp:
 #         print(f"Error: {exp}")
 #
+#
+#
+#
+#
 # @app.task
 # def capture_initial_network_calls_sync():
 #     asyncio.run(capture_initial_network_calls())
+#
+# # capture_initial_network_calls_sync()
+#
+# # encSaltC: iSVVXEo0OCtazcQIUBlG
+# # userid: 90296TECH
+# # membercode: 90296
+# # password: eKX46NzEPD+2Y7CBZiFR/w==
+# # encrPassMD5: 88a55a608d4cb6e3a2f75682d51b474d
+# # encrSaltPassMD5: 9c4acfb216fdd381ac540e8d2092affb
+# # encrPassSHA: 4136311331c758b9e999fe6f0ebd0a3308365e3a82900701dd3fc48de0659131
+# # encrSaltPassSHA: 643b407f4b4b938fb267cc2556baef91c4b74b0b6f42bca0651dce38d0ec0d73
+# # captchaCode: captchaCode
+# # UserCaptchaCode1: LL@JWP
+# #
+# # encSaltC: XHZKCQ5AqilM38kqmQi0
+# # userid: 90296TECH
+# # membercode: 90296
+# # password: eKX46NzEPD+2Y7CBZiFR/w==
+# # encrPassMD5: 88a55a608d4cb6e3a2f75682d51b474d
+# # encrSaltPassMD5: 9c4acfb216fdd381ac540e8d2092affb
+# # encrPassSHA: 4136311331c758b9e999fe6f0ebd0a3308365e3a82900701dd3fc48de0659131
+# # encrSaltPassSHA: 643b407f4b4b938fb267cc2556baef91c4b74b0b6f42bca0651dce38d0ec0d73
+# # captchaCode: captchaCode
+# # UserCaptchaCode1: xHWPTc
