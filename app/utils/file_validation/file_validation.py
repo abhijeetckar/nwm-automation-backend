@@ -3,28 +3,77 @@ import zipfile
 import gzip
 import re
 
+from app.models.file_models import DatColumn
+
 # Specify the folder path
-folder_path = "downloads"
+# folder_path = "downloads/C_VAR1_05032025_6.DAT"
 
 
 def read_dat_file(file_path):
     """Reads a DAT file and extracts both Control and Detail records."""
-    col_names_detail = [
-        "Record Type", "Sec Symbol", "Sec Series", "ISIN", "Security VAR", "Filler",
-        "VAR Margin", "Extreme Loss Rate", "Additional Margin", "Daily Margin Rate"
-    ]
+    file_name = file_path.split('\\')[-1].split(".")[0]
+    # Extract "C_VAR1"
+    extracted_part = "_".join(file_name.split("_")[:-2])
 
     try:
         df = pd.read_csv(file_path, header=None,skiprows=1)
 
         detail_records = df[df[0] == 20]  # Extract detail records
-        detail_records.columns = col_names_detail
+        detail_records.columns = getattr(DatColumn, extracted_part)
 
         pd_table = pd.concat([detail_records], ignore_index=True)
         return pd_table
     except Exception as e:
         print(f"Error reading DAT file {file_path}: {e}")
         return None
+
+def read_dat_integer_extention(file_path):
+    """Reads a DAT file and extracts both Control and Detail records dynamically based on the identifier."""
+
+    # Try reading the file with a flexible encoding
+    try:
+        df = pd.read_csv(file_path, header=None, delimiter="~", dtype=str, encoding="ISO-8859-1")
+        df.fillna("", inplace=True)  # Replace NaN with empty strings
+
+        unique_types = df[0].unique()  # Find all unique record types
+
+        result_dfs = []
+        extracted_part = file_path.split('\\')[-1].split(".")[0][2:-1]
+        column_mappings = getattr(DatColumn, extracted_part)
+
+        for record_type in unique_types:
+            record_str = str(record_type).zfill(2)  # Format as "01", "02", etc.
+
+            if record_str in column_mappings:
+                subset_df = df[df[0] == record_type]  # Extract only the relevant rows
+                expected_columns = column_mappings[record_str]
+
+
+                actual_columns = subset_df.shape[1]
+                expected_columns_count = len(expected_columns)
+
+                if actual_columns > expected_columns_count:
+                    print(f"More columns than expected in record {record_str}. Trimming extra columns.")
+                    subset_df = subset_df.iloc[:, :expected_columns_count]  # Trim extra columns
+
+                elif actual_columns < expected_columns_count:
+                    print(f"Fewer columns than expected in record {record_str}. Padding missing columns.")
+                    for i in range(actual_columns, expected_columns_count):
+                        subset_df[i] = ""  # Add empty values for missing columns
+
+                subset_df.columns = expected_columns  # Assign correct headers
+                result_dfs.append(subset_df)
+
+        if result_dfs:
+            final_df = pd.concat(result_dfs, ignore_index=True)
+            return final_df
+
+        return None
+
+    except Exception as e:
+        print(f"Error reading DAT file {file_path}: {e}")
+        return None
+
 def extract_fixed_column_tables(lines):
     """Extract tables from a CSV.GZ file with fixed column structures."""
     try:
@@ -67,6 +116,8 @@ def read_file(file_path):
     """ Use swtich case instead of if elif"""
     try:
         file_extension = file_path.split('.')[-1].lower()  # Convert to lowercase for consistency
+        if file_extension.isdigit():
+            return read_dat_integer_extention(file_path)
         match file_extension:
             case "csv":
                 return pd.read_csv(file_path, on_bad_lines='skip', engine='python')
@@ -94,7 +145,7 @@ def extract_data(file_path):
 
 
 try:
-    k = extract_data("C:\\Users\\Lenovo\\Desktop\\workspace\\nwm-automation-backend_1\\downloads\\C_VAR1_05032025_6.DAT")
+    k = extract_data("C:\\Users\\Lenovo\\Desktop\\workspace\\nwm-automation-backend_1\\downloads\\40DP37U.835385")
     print(k)
 except Exception as exp:
     print(exp)
